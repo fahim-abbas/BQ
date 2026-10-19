@@ -1,0 +1,650 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Score Game</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 15px 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+            background-color: #f0f0f0;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 550px;
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            overflow-y: auto;
+            max-height: 90vh;
+            box-sizing: border-box;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .player-inputs {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .player-inputs label,
+        .player-inputs input {
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        input, select {
+            padding: 8px;
+            margin-top: 4px;
+            box-sizing: border-box;
+        }
+
+        .player-scores {
+            margin-top: 20px;
+        }
+
+        .highlight-high {
+            color: red;
+        }
+
+        .highlight-low {
+            color: green;
+        }
+
+        .round-table {
+            margin-top: 20px;
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .round-table th,
+        .round-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+
+        .round-table th {
+            background-color: #f2f2f2;
+        }
+
+        .green-row {
+            background-color: #ECFFDC;
+        }
+
+        .red-row {
+            background-color: #ffb2b2;
+        }
+
+        button {
+            margin: 5px 4px 5px 0;
+            padding: 10px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            background-color: #c0c0c0;
+            cursor: not-allowed;
+        }
+
+        .moon-button {
+            background-color: #6f42c1;
+        }
+
+        .restart-button {
+            background-color: #dc3545;
+        }
+
+        .secondary-button {
+            background-color: #6c757d;
+        }
+
+        /* Dialogs */
+        .dialog-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.55);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 15px;
+            z-index: 1000;
+        }
+
+        .dialog {
+            background: white;
+            width: 100%;
+            max-width: 400px;
+            padding: 22px;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+            box-sizing: border-box;
+        }
+
+        .dialog h3 {
+            margin-top: 0;
+        }
+
+        .dialog select {
+            width: 100%;
+            margin: 12px 0;
+        }
+
+        .dialog-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 12px;
+        }
+
+        .dialog-actions button {
+            flex: 1;
+        }
+
+        .moon-note {
+            font-size: 13px;
+            color: #555;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h2>Score Game</h2>
+
+        <div id="roundSetup">
+            <label for="numPlayers">Number of Players:</label>
+            <input type="number" id="numPlayers" min="1" required>
+
+            <br><br>
+
+            <label for="totalScore">Total Score for Each Round:</label>
+            <input type="number" id="totalScore" min="1" required>
+
+            <br><br>
+
+            <button onclick="setupPlayers()">Next</button>
+        </div>
+
+        <div id="playerSetup" class="hidden">
+            <h3>Enter Player Names</h3>
+            <div id="nameFields" class="player-inputs"></div>
+            <button onclick="submitNames()">Submit Names</button>
+        </div>
+
+        <div id="scoreInput" class="hidden">
+            <h3>
+                Enter Scores for Round
+                <span id="roundNumber">1</span>
+            </h3>
+
+            <div id="scoreFields" class="player-inputs"></div>
+
+            <button onclick="submitScores()">Submit Scores</button>
+
+            <button class="moon-button" onclick="openMoonDialog()">
+                Shoot the Moon
+            </button>
+        </div>
+
+        <div id="scoreBoard" class="hidden">
+            <h3>Score Board</h3>
+
+            <div id="scoreBoardContent">
+                <ul id="playerScores"></ul>
+
+                <h3>Round-wise Scores</h3>
+                <table id="roundScores" class="round-table"></table>
+            </div>
+
+            <button class="restart-button" onclick="openRestartDialog()">
+                Restart Game
+            </button>
+
+            <button onclick="takeScreenshot()">Screenshot</button>
+
+            <br><br>
+        </div>
+    </div>
+
+    <!-- Shoot the Moon dialog -->
+    <div id="moonDialog" class="dialog-overlay hidden"
+         role="dialog" aria-modal="true"
+         aria-labelledby="moonDialogTitle">
+
+        <div class="dialog">
+            <h3 id="moonDialogTitle">Shoot the Moon</h3>
+
+            <label for="moonPlayer">Which player shot the moon?</label>
+
+            <select id="moonPlayer">
+                <option value="">Select a player</option>
+            </select>
+
+            <p class="moon-note">
+                The selected player receives 0 points for this round.
+                Every other player receives the total round score.
+            </p>
+
+            <div class="dialog-actions">
+                <button onclick="submitMoon()">Submit</button>
+                <button class="secondary-button"
+                        onclick="closeMoonDialog()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Restart Game dialog -->
+    <div id="restartDialog" class="dialog-overlay hidden"
+         role="dialog" aria-modal="true"
+         aria-labelledby="restartDialogTitle">
+
+        <div class="dialog">
+            <h3 id="restartDialogTitle">Restart Game</h3>
+
+            <p>How would you like to restart?</p>
+
+            <div class="dialog-actions">
+                <button onclick="restartSamePlayers()">
+                    Same Players
+                </button>
+
+                <button onclick="restartNewPlayers()">
+                    New Players
+                </button>
+
+                <button class="secondary-button"
+                        onclick="closeRestartDialog()">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
+    <script>
+        let numPlayers;
+        let totalRoundScore;
+        let players = [];
+        let round = 1;
+        let roundScores = [];
+
+        function setupPlayers() {
+            totalRoundScore = parseInt(
+                document.getElementById('totalScore').value, 10
+            );
+
+            numPlayers = parseInt(
+                document.getElementById('numPlayers').value, 10
+            );
+
+            if (
+                !Number.isInteger(totalRoundScore) ||
+                !Number.isInteger(numPlayers) ||
+                totalRoundScore <= 0 ||
+                numPlayers <= 0
+            ) {
+                alert('Please enter valid total score and number of players.');
+                return;
+            }
+
+            const nameFields = document.getElementById('nameFields');
+            nameFields.innerHTML = '';
+
+            for (let i = 0; i < numPlayers; i++) {
+                nameFields.innerHTML += `
+                    <div>
+                        <label for="player${i}">Player ${i + 1} Name:</label>
+                        <input type="text" id="player${i}" required>
+                    </div>`;
+            }
+
+            document.getElementById('roundSetup').classList.add('hidden');
+            document.getElementById('playerSetup').classList.remove('hidden');
+        }
+
+        function submitNames() {
+            players = [];
+
+            for (let i = 0; i < numPlayers; i++) {
+                const playerName = document
+                    .getElementById(`player${i}`).value.trim();
+
+                if (!playerName) {
+                    alert('Please enter all player names.');
+                    return;
+                }
+
+                players.push({
+                    name: playerName,
+                    totalScore: 0
+                });
+            }
+
+            updateScoreBoard();
+            setupScoreFields();
+            updateRoundScoresTable();
+
+            document.getElementById('playerSetup').classList.add('hidden');
+            document.getElementById('scoreInput').classList.remove('hidden');
+            document.getElementById('scoreBoard').classList.remove('hidden');
+        }
+
+        function setupScoreFields() {
+            const scoreFields = document.getElementById('scoreFields');
+            scoreFields.innerHTML = '';
+
+            players.forEach((player, index) => {
+                const field = document.createElement('div');
+                const label = document.createElement('label');
+                const input = document.createElement('input');
+
+                label.htmlFor = `score${index}`;
+                label.textContent = `${player.name}'s Score:`;
+
+                input.type = 'number';
+                input.id = `score${index}`;
+                input.required = true;
+
+                field.appendChild(label);
+                field.appendChild(input);
+                scoreFields.appendChild(field);
+            });
+        }
+
+        function submitScores() {
+            const scores = [];
+
+            for (let i = 0; i < players.length; i++) {
+                const value = document.getElementById(`score${i}`).value.trim();
+                const score = value === '' ? 0 : Number(value);
+
+                if (!Number.isSafeInteger(score)) {
+                    alert('Please enter valid whole-number scores for all players.');
+                    return;
+                }
+
+                scores.push(score);
+            }
+
+            const roundScore = scores.reduce((sum, score) => sum + score, 0);
+            const expectedAlternative =
+                totalRoundScore * (players.length - 1);
+
+            if (
+                roundScore !== totalRoundScore &&
+                roundScore !== expectedAlternative
+            ) {
+                alert(
+                    `Scores do not match the criteria.\n\n` +
+                    `The total must be ${totalRoundScore}, or ` +
+                    `${expectedAlternative}.\n` +
+                    `Current Total: ${roundScore}\n` +
+                    `Current Difference: ${totalRoundScore - roundScore}`
+                );
+                return;
+            }
+
+            recordRound(scores);
+        }
+
+        // Shoot the Moon
+        function openMoonDialog() {
+            const dropdown = document.getElementById('moonPlayer');
+            dropdown.innerHTML = '';
+
+            const placeholder = document.createElement('option');
+            placeholder.value = '';
+            placeholder.textContent = 'Select a player';
+            dropdown.appendChild(placeholder);
+
+            players.forEach((player, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = player.name;
+                dropdown.appendChild(option);
+            });
+
+            document.getElementById('moonDialog').classList.remove('hidden');
+        }
+
+        function closeMoonDialog() {
+            document.getElementById('moonDialog').classList.add('hidden');
+        }
+
+        function submitMoon() {
+            const selectedPlayer = document.getElementById('moonPlayer').value;
+
+            if (selectedPlayer === '') {
+                alert('Please select which player shot the moon.');
+                return;
+            }
+
+            const moonPlayerIndex = Number(selectedPlayer);
+
+            // The moon shooter gets zero; every other player gets
+            // the total round score.
+            const scores = players.map((player, index) =>
+                index === moonPlayerIndex ? 0 : totalRoundScore
+            );
+
+            closeMoonDialog();
+            recordRound(scores);
+        }
+
+        // Record both normal rounds and Shoot the Moon rounds.
+        function recordRound(scores) {
+            players.forEach((player, index) => {
+                player.totalScore += scores[index];
+            });
+
+            roundScores.push([...scores]);
+
+            round++;
+            document.getElementById('roundNumber').textContent = round;
+
+            updateScoreBoard();
+            setupScoreFields();
+            updateRoundScoresTable();
+        }
+
+        function updateScoreBoard() {
+            const playerScores = document.getElementById('playerScores');
+            playerScores.innerHTML = '';
+
+            const sortedPlayers = [...players].sort(
+                (a, b) => a.totalScore - b.totalScore
+            );
+
+            sortedPlayers.forEach(player => {
+                const item = document.createElement('li');
+
+                if (player.totalScore === sortedPlayers[0].totalScore) {
+                    item.classList.add('highlight-low');
+                }
+
+                if (
+                    player.totalScore ===
+                    sortedPlayers[sortedPlayers.length - 1].totalScore
+                ) {
+                    item.classList.add('highlight-high');
+                }
+
+                item.textContent = `${player.name}: ${player.totalScore}`;
+                playerScores.appendChild(item);
+            });
+        }
+
+        function updateRoundScoresTable() {
+            const table = document.getElementById('roundScores');
+            table.innerHTML = '';
+
+            const headerRow = document.createElement('tr');
+
+            ['Round', ...players.map(player => player.name), 'Total']
+                .forEach(text => {
+                    const th = document.createElement('th');
+                    th.textContent = text;
+                    headerRow.appendChild(th);
+                });
+
+            table.appendChild(headerRow);
+
+            roundScores.forEach((scores, index) => {
+                const total = scores.reduce((sum, score) => sum + score, 0);
+                const expectedAlternative =
+                    totalRoundScore * (players.length - 1);
+
+                const isCorrect =
+                    total === totalRoundScore ||
+                    total === expectedAlternative;
+
+                const row = document.createElement('tr');
+                row.className = isCorrect ? 'green-row' : 'red-row';
+
+                const roundCell = document.createElement('td');
+                roundCell.textContent = index + 1;
+                row.appendChild(roundCell);
+
+                scores.forEach(score => {
+                    const cell = document.createElement('td');
+                    cell.textContent = score;
+                    row.appendChild(cell);
+                });
+
+                const totalCell = document.createElement('td');
+                totalCell.textContent = total;
+                row.appendChild(totalCell);
+
+                table.appendChild(row);
+            });
+        }
+
+        // Restart Game
+        function openRestartDialog() {
+            document.getElementById('restartDialog')
+                .classList.remove('hidden');
+        }
+
+        function closeRestartDialog() {
+            document.getElementById('restartDialog')
+                .classList.add('hidden');
+        }
+
+        function restartSamePlayers() {
+            closeRestartDialog();
+
+            round = 1;
+            roundScores = [];
+
+            players.forEach(player => {
+                player.totalScore = 0;
+            });
+
+            document.getElementById('roundNumber').textContent = round;
+
+            updateScoreBoard();
+            setupScoreFields();
+            updateRoundScoresTable();
+
+            document.getElementById('scoreInput').classList.remove('hidden');
+            document.getElementById('scoreBoard').classList.remove('hidden');
+            document.getElementById('playerSetup').classList.add('hidden');
+            document.getElementById('roundSetup').classList.add('hidden');
+
+            window.scrollTo(0, 0);
+        }
+
+        function restartNewPlayers() {
+            closeRestartDialog();
+
+            // Clear game state and return to initial setup.
+            numPlayers = undefined;
+            totalRoundScore = undefined;
+            players = [];
+            round = 1;
+            roundScores = [];
+
+            document.getElementById('numPlayers').value = '';
+            document.getElementById('totalScore').value = '';
+            document.getElementById('nameFields').innerHTML = '';
+            document.getElementById('scoreFields').innerHTML = '';
+            document.getElementById('playerScores').innerHTML = '';
+            document.getElementById('roundScores').innerHTML = '';
+            document.getElementById('roundNumber').textContent = round;
+
+            document.getElementById('roundSetup').classList.remove('hidden');
+            document.getElementById('playerSetup').classList.add('hidden');
+            document.getElementById('scoreInput').classList.add('hidden');
+            document.getElementById('scoreBoard').classList.add('hidden');
+
+            window.scrollTo(0, 0);
+        }
+
+        function takeScreenshot() {
+            const content = document.getElementById('scoreBoardContent');
+
+            if (typeof html2canvas !== 'function') {
+                alert('Screenshot library could not be loaded. Please check your internet connection.');
+                return;
+            }
+
+            html2canvas(content).then(canvas => {
+                const link = document.createElement('a');
+                link.download = 'scoreboard.png';
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            }).catch(() => {
+                alert('Unable to create the screenshot.');
+            });
+        }
+
+        // Close dialogs when clicking their dark background.
+        document.getElementById('moonDialog').addEventListener('click', event => {
+            if (event.target.id === 'moonDialog') {
+                closeMoonDialog();
+            }
+        });
+
+        document.getElementById('restartDialog').addEventListener('click', event => {
+            if (event.target.id === 'restartDialog') {
+                closeRestartDialog();
+            }
+        });
+
+        // Escape closes an open dialog.
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape') {
+                closeMoonDialog();
+                closeRestartDialog();
+            }
+        });
+
+        // Preserve the refresh warning.
+        window.onbeforeunload = function (event) {
+            event.preventDefault();
+            event.returnValue = '';
+        };
+    </script>
+</body>
+</html>
